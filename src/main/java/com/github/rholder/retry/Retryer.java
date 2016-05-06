@@ -151,6 +151,7 @@ public final class Retryer<V> {
      * @throws RetryException     if all the attempts failed before the stop strategy decided
      *                            to abort, or the thread was interrupted. Note that if the thread is interrupted,
      *                            this exception is thrown and the thread's interrupt status is set.
+     * @throws Error all Errors but {@link AssertionError} (in case of usages in a test context) are re-thrown
      */
     public V call(Callable<V> callable) throws ExecutionException, RetryException {
         long startTime = System.nanoTime();
@@ -159,8 +160,13 @@ public final class Retryer<V> {
             try {
                 V result = attemptTimeLimiter.call(callable);
                 attempt = new ResultAttempt<V>(result, attemptNumber, TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startTime));
+            } catch (AssertionError ae) {
+                attempt = createExceptionAttempt(ae, startTime, attemptNumber);
+            } catch (Error e) {
+                // Errors indicate serious problems we should not catch
+                throw e;
             } catch (Throwable t) {
-                attempt = new ExceptionAttempt<V>(t, attemptNumber, TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startTime));
+                attempt = createExceptionAttempt(t, startTime, attemptNumber);
             }
 
             for (RetryListener listener : listeners) {
@@ -182,6 +188,10 @@ public final class Retryer<V> {
                 }
             }
         }
+    }
+
+    private ExceptionAttempt<V> createExceptionAttempt(Throwable t, long startTime, int attemptNumber) {
+        return new ExceptionAttempt<V>(t, attemptNumber, TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startTime));
     }
 
     /**
