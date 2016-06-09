@@ -17,13 +17,18 @@
 package com.github.rholder.retry;
 
 import com.google.common.base.Predicates;
+import org.hamcrest.CoreMatchers;
+import org.junit.Rule;
 import org.junit.Test;
+import org.junit.rules.ExpectedException;
 
 import java.util.concurrent.Callable;
-
-import static org.junit.Assert.*;
+import java.util.concurrent.ExecutionException;
 
 public class RetryerTest {
+
+    @Rule
+    private ExpectedException expectedException = ExpectedException.none();
 
     private final Retryer<Object> sut = new Retryer<Object>(
             StopStrategies.stopAfterAttempt(2),
@@ -32,22 +37,41 @@ public class RetryerTest {
 
     @Test
     public void givenBlockThrowingAssertionError() throws Exception {
+        sut.call(Callables.throwing(new AssertionError()));
+    }
+
+    @Test(expected = Error.class)
+    public void givenBlockThrowingError() throws Exception {
         sut.call(new Callable<Object>() {
             @Override
             public Object call() throws Exception {
-                throw new AssertionError();
+                throw new Error();
             }
         });
     }
 
-    @Test(expected = OutOfMemoryError.class)
-    public void givenBlockThrowingOOMError() throws Exception {
+    @Test
+    public void givenBlockThrowingException() throws Exception {
+        expectedException.expect(ExecutionException.class);
+        expectedException.expectCause(CoreMatchers.);
+
         sut.call(new Callable<Object>() {
             @Override
             public Object call() throws Exception {
-                throw new OutOfMemoryError();
+                throw new Exception("my exception");
             }
         });
     }
 
+    private static class Callables {
+
+        public static Callable throwing(final Throwable e) {
+            return new Callable() {
+                @Override
+                public Object call() throws Exception {
+                    throw e;
+                }
+            };
+        }
+    }
 }

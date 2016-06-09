@@ -151,7 +151,10 @@ public final class Retryer<V> {
      * @throws RetryException     if all the attempts failed before the stop strategy decided
      *                            to abort, or the thread was interrupted. Note that if the thread is interrupted,
      *                            this exception is thrown and the thread's interrupt status is set.
-     * @throws Error all Errors but {@link AssertionError} (in case of usages in a test context) are re-thrown
+     * @throws Error In case the given callable throws an Error, it is re-thrown immediately.
+     *               In fact, Error indicates serious problems such as {@link OutOfMemoryError} which should be thrown ASAP.
+     *               The only exception is {@link AssertionError}, which, in a test context, does not represent any serious problem,
+     *               but just a failed test assertion.
      */
     public V call(Callable<V> callable) throws ExecutionException, RetryException {
         long startTime = System.nanoTime();
@@ -163,8 +166,8 @@ public final class Retryer<V> {
             } catch (AssertionError ae) {
                 attempt = createExceptionAttempt(ae, startTime, attemptNumber);
             } catch (Error e) {
-                // Errors indicate serious problems we should not catch
-                throw e;
+                // stop retrying if a serious problem such as OOMError has just occurred
+                throw new RetryException(attemptNumber, createExceptionAttempt(e, startTime, attemptNumber));
             } catch (Throwable t) {
                 attempt = createExceptionAttempt(t, startTime, attemptNumber);
             }

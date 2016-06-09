@@ -571,4 +571,16 @@ public class RetryerBuilderTest {
             }
         };
     }
+
+    @Test
+    public void givenBuilderWithDefaultsAndCallableThrowingException() throws Exception {
+        Retryer<Object> sut = RetryerBuilder.newBuilder().build();
+        sut.call(new Callable<Object>() {
+            @Override
+            public Object call() throws Exception {
+                throw new RuntimeException("");
+            }
+        });
+
+    }
 }
